@@ -3,6 +3,7 @@ const Discord = require('discord.js')
 const ytsr = require('ytsr')
 const ytpl = require('ytpl')
 const spotify = require('spotify-url-info')
+const importer = require('playlist-importer-lite');
 const Queue = require('./Queue')
 const Track = require('./Track')
 
@@ -190,6 +191,22 @@ class Player {
                 const spotifyData = await spotify.getPreview(query).catch(e => resolve([]))
                 query = `${spotifyData.artist} - ${spotifyData.track}`
             }
+
+            const matchSpotifyPlaylistURL = query.match(/https?:\/\/(?:embed\/playlist\.|open\.)(?:spotify\.com\/)(?:playlist\/|\?uri=spotify:playlist:)((\w|-){22})/)
+            if (matchSpotifyPlaylistURL) {
+                const spotifyPlaylistData = await importer.getPlaylistData(query);
+                let playlist = []
+                await Promise.all(spotifyPlaylistData.tracklist.map(async (spotifyTrack) => {
+                    const song = `${spotifyTrack.artist} - ${spotifyTrack.title}`
+                    let result = await ytsr(song, {limit: 1});
+                    const track = new Track(result.items[0], null, null)
+                    return track;
+                })).then(tracks => {
+                    playlist = tracks;
+                })
+                resolve(playlist)
+            }
+
             // eslint-disable-next-line no-useless-escape
             const matchYoutubeURL = query.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)
             if (matchYoutubeURL) {
